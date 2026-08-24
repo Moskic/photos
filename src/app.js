@@ -23,10 +23,13 @@ const state = {
   photos: [],
   visiblePhotos: [],
   shuffledPhotos: null,
+  tilts: new Map(),
   activeIndex: -1,
   returnFocus: null,
   lightboxMoving: false,
-  lightboxDirection: 0
+  lightboxDirection: 0,
+  lightboxClosing: false,
+  lightboxAnimationTimer: null
 };
 
 const SETTINGS_STORAGE_KEY = "static-photo-gallery-wall-controls";
@@ -93,10 +96,13 @@ function clearStatus() {
   delete elements.status.dataset.kind;
 }
 
-function tiltFromId(id, range = 3.6) {
-  let hash = 0;
-  for (const character of id) hash = ((hash << 5) - hash + character.codePointAt(0)) | 0;
-  return (((Math.abs(hash) % 1000) / 999) * range * 2 - range).toFixed(2) + "deg";
+function tiltForPhoto(id, range = 2.2) {
+  if (!state.tilts.has(id)) {
+    let angle = (Math.random() * range * 2) - range;
+    if (Math.abs(angle) < 0.35) angle = angle < 0 ? -0.35 : 0.35;
+    state.tilts.set(id, `${angle.toFixed(2)}deg`);
+  }
+  return state.tilts.get(id);
 }
 
 function liftFromId(id) {
@@ -168,7 +174,7 @@ function createPhotoCard(photo, index) {
   card.type = "button";
   card.dataset.photoId = photo.id;
   card.setAttribute("aria-label", `View ${photo.name}`);
-  card.style.setProperty("--tilt", tiltFromId(photo.id));
+  card.style.setProperty("--tilt", tiltForPhoto(photo.id));
   card.style.setProperty("--lift", liftFromId(photo.id));
   card.style.setProperty("--card-width", cardWidthForPhoto(photo));
 
@@ -235,7 +241,7 @@ function renderAlbums(albums) {
     const covers = Array.isArray(album.covers) ? album.covers : [];
     const photo = covers[Math.floor(Math.random() * covers.length)];
     if (photo) {
-      link.style.setProperty("--tilt", tiltFromId(stablePhotoId(photo)));
+      link.style.setProperty("--tilt", tiltForPhoto(stablePhotoId(photo)));
       link.style.setProperty("--card-width", cardWidthForPhoto(photo));
       cover.style.aspectRatio = `${photo.width} / ${photo.height}`;
       const image = document.createElement("img");
@@ -398,15 +404,42 @@ function renderLightboxSlides() {
 function openLightbox(index, card) {
   state.activeIndex = index;
   state.returnFocus = card;
+  state.lightboxClosing = false;
   renderLightboxSlides();
   document.body.classList.add("lightbox-open");
   elements.lightbox.showModal();
+  elements.lightbox.classList.remove("is-closing");
+  if (!prefersReducedMotion.matches) {
+    elements.lightbox.classList.add("is-opening");
+    clearTimeout(state.lightboxAnimationTimer);
+    state.lightboxAnimationTimer = setTimeout(() => {
+      elements.lightbox.classList.remove("is-opening");
+      state.lightboxAnimationTimer = null;
+    }, 240);
+  }
   elements.lightboxClose.focus();
+}
+
+function finishClosingLightbox() {
+  clearTimeout(state.lightboxAnimationTimer);
+  state.lightboxAnimationTimer = null;
+  elements.lightbox.classList.remove("is-opening", "is-closing");
+  state.lightboxClosing = false;
+  if (elements.lightbox.open) elements.lightbox.close();
 }
 
 function closeLightbox() {
   if (!elements.lightbox.open) return;
-  elements.lightbox.close();
+  if (prefersReducedMotion.matches) {
+    finishClosingLightbox();
+    return;
+  }
+  if (state.lightboxClosing) return;
+  state.lightboxClosing = true;
+  clearTimeout(state.lightboxAnimationTimer);
+  elements.lightbox.classList.remove("is-opening");
+  elements.lightbox.classList.add("is-closing");
+  state.lightboxAnimationTimer = setTimeout(finishClosingLightbox, 180);
 }
 
 function moveLightbox(direction) {
@@ -469,12 +502,21 @@ elements.lightbox.addEventListener("click", (event) => {
   }
 });
 
+elements.lightbox.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  closeLightbox();
+});
+
 elements.lightbox.addEventListener("close", () => {
+  clearTimeout(state.lightboxAnimationTimer);
+  state.lightboxAnimationTimer = null;
+  elements.lightbox.classList.remove("is-opening", "is-closing");
   document.body.classList.remove("lightbox-open");
   const target = state.returnFocus;
   state.activeIndex = -1;
   state.lightboxMoving = false;
   state.lightboxDirection = 0;
+  state.lightboxClosing = false;
   state.returnFocus = null;
   if (target?.isConnected) target.focus();
 });

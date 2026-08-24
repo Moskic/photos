@@ -12,7 +12,7 @@ photos/
 
 ## Build and preview
 
-Requires Node.js 20 or newer.
+Requires Node.js 20.9 or newer.
 
 ```bash
 npm install
@@ -27,6 +27,7 @@ Open `http://localhost:8000/` for the album index or a route such as `http://loc
 ## Photos
 
 - Supported formats: JPG, JPEG, PNG, WebP, GIF, and AVIF.
+- The build converts still images to a single WebP with a maximum width or height of 2400px. GIF files are copied unchanged.
 - Album folder names must start and end with a lowercase letter or number and may contain `-` or `_`. Photo filenames may contain spaces, Chinese, emoji, and special characters.
 - Capture dates come from EXIF `DateTimeOriginal`, then `CreateDate`, then a valid nested path such as `2026/01/02/` or `2026-01-02/`.
 - Standard order is oldest to newest; undated photos follow in natural relative-path order. Reverse shows the opposite order. Random is enabled by default.

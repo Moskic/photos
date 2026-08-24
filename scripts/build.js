@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import exifr from "exifr";
 import { imageSize } from "image-size-next";
+import sharp from "sharp";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const photosDirectory = path.join(root, "photos");
@@ -145,13 +146,27 @@ async function buildPhoto(album, relativePath, mediaDirectory) {
     .update(bytes)
     .digest("hex")
     .slice(0, 20);
-  const outputFilename = `${id}${extension}`;
-  await copyFile(sourcePath, path.join(mediaDirectory, outputFilename));
-
-  let width = dimensions.width;
-  let height = dimensions.height;
-  const orientation = Number(metadata.Orientation ?? dimensions.orientation);
-  if ([5, 6, 7, 8].includes(orientation)) [width, height] = [height, width];
+  const outputFilename = extension === ".gif" ? `${id}${extension}` : `${id}.webp`;
+  let width;
+  let height;
+  if (extension === ".gif") {
+    await copyFile(sourcePath, path.join(mediaDirectory, outputFilename));
+    width = dimensions.width;
+    height = dimensions.height;
+  } else {
+    let output;
+    try {
+      output = await sharp(sourcePath)
+        .rotate()
+        .resize({ width: 2400, height: 2400, fit: "inside", withoutEnlargement: true })
+        .webp({ quality: 82, effort: 4 })
+        .toFile(path.join(mediaDirectory, outputFilename));
+    } catch (error) {
+      throw new Error(`Could not create WebP for ${path.relative(root, sourcePath)}: ${error.message}`);
+    }
+    width = output.width;
+    height = output.height;
+  }
 
   const exifDate = isValidDate(metadata.DateTimeOriginal)
     ? metadata.DateTimeOriginal

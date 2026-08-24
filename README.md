@@ -50,3 +50,9 @@ Open `http://localhost:8000/` for the album index or a route such as `http://loc
 The folder name remains the URL. Albums without a configured title use their folder name. Albums omitted from `order` are appended in natural folder-name order. Invalid, unknown, or duplicate configuration entries fail the build.
 
 The wall includes Random, Reverse, Show name, and Show time controls. Their values are saved in the current browser with `localStorage`. Photos open in a responsive keyboard-accessible lightbox.
+
+## License
+
+The source code is licensed under the [MIT License](LICENSE).
+
+The photographs under `photos/` are not covered by the MIT License. See the separate [Photograph Rights Notice](PHOTOS_LICENSE.md); all rights to those photographs are reserved.

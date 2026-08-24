@@ -12,6 +12,14 @@ const outputDirectory = path.join(root, "dist");
 const supportedExtensions = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif"]);
 const validAlbumName = /^[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?$/;
 const naturalSort = new Intl.Collator("en", { numeric: true, sensitivity: "base" });
+const defaultPhotoNamePatterns = [
+  /^(?:img|dsc|dscn|dscf|pxl|dji|gopr|mvimg|image|photo)[-_ ]?[a-z]?\d.*$/iu,
+  /^(?:screenshot|screen[ _-]?shot|截屏|屏幕快照|微信图片|mmexport|wx_camera|whatsapp[ _-]?image|signal|telegram).*$/iu,
+  /^\d{4}[-_.]\d{1,2}[-_.]\d{1,2}(?:[ T_-].*)?$/u,
+  /^\d{8,}(?:[-_ ]\d+)*$/u,
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu,
+  /^[0-9a-f]{24,}$/iu
+];
 let warningCount = 0;
 
 function warn(message) {
@@ -24,11 +32,81 @@ function json(data) {
 }
 
 function formatDate(value) {
-  if (!(value instanceof Date) || Number.isNaN(value.getTime())) return null;
+  if (!isValidDate(value)) return null;
   const year = String(value.getFullYear()).padStart(4, "0");
   const month = String(value.getMonth() + 1).padStart(2, "0");
   const day = String(value.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function isValidDate(value) {
+  return value instanceof Date && !Number.isNaN(value.getTime());
+}
+
+function dateFromParts(yearValue, monthValue, dayValue) {
+  const year = Number(yearValue);
+  const month = Number(monthValue);
+  const day = Number(dayValue);
+  const value = new Date(year, month - 1, day);
+  if (
+    !Number.isInteger(year) ||
+    year < 1900 ||
+    year > 2199 ||
+    value.getFullYear() !== year ||
+    value.getMonth() !== month - 1 ||
+    value.getDate() !== day
+  ) {
+    return null;
+  }
+  return value;
+}
+
+function dateFromRelativePath(relativePath) {
+  const directories = relativePath.split("/").slice(0, -1);
+  for (let index = 0; index <= directories.length - 3; index += 1) {
+    if (!/^\d{4}$/.test(directories[index])) continue;
+    if (!/^\d{1,2}$/.test(directories[index + 1])) continue;
+    if (!/^\d{1,2}$/.test(directories[index + 2])) continue;
+    const date = dateFromParts(directories[index], directories[index + 1], directories[index + 2]);
+    if (date) return date;
+  }
+  for (const directory of directories) {
+    const match = directory.match(/^(\d{4})[-_.](\d{1,2})[-_.](\d{1,2})$/);
+    if (!match) continue;
+    const date = dateFromParts(match[1], match[2], match[3]);
+    if (date) return date;
+  }
+  return null;
+}
+
+function displayNameFromFilename(filename) {
+  const name = path.basename(filename, path.extname(filename)).trim();
+  return defaultPhotoNamePatterns.some((pattern) => pattern.test(name)) ? null : name;
+}
+
+async function findPhotoFiles(directory, prefix = "") {
+  const entries = (await readdir(directory, { withFileTypes: true }))
+    .filter((entry) => !entry.name.startsWith("."))
+    .sort((left, right) => naturalSort.compare(left.name, right.name));
+  const files = [];
+  for (const entry of entries) {
+    const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      files.push(...await findPhotoFiles(path.join(directory, entry.name), relativePath));
+    } else if (entry.isFile() && supportedExtensions.has(path.extname(entry.name).toLowerCase())) {
+      files.push(relativePath);
+    }
+  }
+  return files;
+}
+
+function compareBuiltPhotos(left, right) {
+  if (left.sortTime !== null && right.sortTime !== null && left.sortTime !== right.sortTime) {
+    return left.sortTime - right.sortTime;
+  }
+  if (left.sortTime !== null && right.sortTime === null) return -1;
+  if (left.sortTime === null && right.sortTime !== null) return 1;
+  return naturalSort.compare(left.relativePath, right.relativePath);
 }
 
 async function readExif(filePath) {
@@ -44,9 +122,9 @@ async function readExif(filePath) {
   }
 }
 
-async function buildPhoto(album, filename, mediaDirectory) {
-  const sourcePath = path.join(photosDirectory, album, filename);
-  const extension = path.extname(filename).toLowerCase();
+async function buildPhoto(album, relativePath, mediaDirectory) {
+  const sourcePath = path.join(photosDirectory, album, ...relativePath.split("/"));
+  const extension = path.extname(relativePath).toLowerCase();
   const bytes = await readFile(sourcePath);
   let dimensions;
   try {
@@ -62,7 +140,7 @@ async function buildPhoto(album, filename, mediaDirectory) {
   const id = createHash("sha256")
     .update(album)
     .update("\0")
-    .update(filename)
+    .update(relativePath)
     .update("\0")
     .update(bytes)
     .digest("hex")
@@ -75,13 +153,22 @@ async function buildPhoto(album, filename, mediaDirectory) {
   const orientation = Number(metadata.Orientation ?? dimensions.orientation);
   if ([5, 6, 7, 8].includes(orientation)) [width, height] = [height, width];
 
+  const exifDate = isValidDate(metadata.DateTimeOriginal)
+    ? metadata.DateTimeOriginal
+    : isValidDate(metadata.CreateDate)
+      ? metadata.CreateDate
+      : null;
+  const takenDate = exifDate ?? dateFromRelativePath(relativePath);
+
   return {
     id,
     src: `/media/${album}/${outputFilename}`,
-    name: path.basename(filename, path.extname(filename)),
-    takenAt: formatDate(metadata.DateTimeOriginal) ?? formatDate(metadata.CreateDate),
+    name: displayNameFromFilename(relativePath),
+    takenAt: formatDate(takenDate),
     width,
-    height
+    height,
+    sortTime: takenDate?.getTime() ?? null,
+    relativePath
   };
 }
 
@@ -180,13 +267,13 @@ async function build() {
       mkdir(mediaAlbum, { recursive: true })
     ]);
 
-    const entries = await readdir(sourceAlbum, { withFileTypes: true });
-    const filenames = entries
-      .filter((entry) => entry.isFile() && supportedExtensions.has(path.extname(entry.name).toLowerCase()))
-      .map((entry) => entry.name)
-      .sort(naturalSort.compare);
-    const photos = [];
-    for (const filename of filenames) photos.push(await buildPhoto(album, filename, mediaAlbum));
+    const relativePaths = await findPhotoFiles(sourceAlbum);
+    const builtPhotos = [];
+    for (const relativePath of relativePaths) {
+      builtPhotos.push(await buildPhoto(album, relativePath, mediaAlbum));
+    }
+    builtPhotos.sort(compareBuiltPhotos);
+    const photos = builtPhotos.map(({ sortTime, relativePath, ...photo }) => photo);
     const title = config.albums[album]?.title.trim() || album;
 
     await Promise.all([

@@ -1,32 +1,39 @@
 # Static Photo Gallery
 
-A framework-free, build-time photo gallery. Each direct child folder under `photos/` becomes an album at the matching URL.
+A framework-free, build-time photo gallery for static hosting. Each direct child of `photos/` becomes an album; nested folders are scanned recursively.
 
 ```text
-photos/hello/  ->  /hello
-photos/japan/  ->  /japan
+photos/
+  hello/                         -> /hello
+  japan/                         -> /japan
+    2026/01/02/IMG_1234.jpg      -> part of /japan
 ```
 
-## Use
+## Build and preview
 
-1. Put browser-supported images (`jpg`, `jpeg`, `png`, `webp`, `gif`, or `avif`) in an album folder.
-2. Keep album folder names URL-safe: lowercase letters, numbers, hyphens, and underscores.
-3. Build the deployable site:
+Requires Node.js 20 or newer.
 
-   ```bash
-   npm install
-   npm run build
-   ```
+```bash
+npm install
+npm run build
+python3 -m http.server 8000 -d dist
+```
 
-4. Preview locally:
+Open `http://localhost:8000/` for the album index or a route such as `http://localhost:8000/hello`.
 
-   ```bash
-   python3 -m http.server 8000 -d dist
-   ```
+`npm run build` clears and recreates `dist/`. Do not edit it manually. For Cloudflare Pages, manually deploy `dist/` as the static output directory.
 
-Open `http://localhost:8000/` to browse all albums, or visit an album directly such as `http://localhost:8000/hello`. Each album card selects one of its photos at random as the cover whenever the homepage loads.
+## Photos
 
-Use `gallery.config.json` to give URL-safe album folders display titles in any language:
+- Supported formats: JPG, JPEG, PNG, WebP, GIF, and AVIF.
+- Album folder names must start and end with a lowercase letter or number and may contain `-` or `_`. Photo filenames may contain spaces, Chinese, emoji, and special characters.
+- Capture dates come from EXIF `DateTimeOriginal`, then `CreateDate`, then a valid nested path such as `2026/01/02/` or `2026-01-02/`.
+- Standard order is oldest to newest; undated photos follow in natural relative-path order. Reverse shows the opposite order. Random is enabled by default.
+- Camera and system names such as `IMG_1234`, `DSC_0042`, `PXL_...`, screenshots, UUIDs, and numeric timestamps are hidden automatically. Descriptive filenames remain visible.
+
+## Album configuration
+
+`gallery.config.json` optionally sets display titles and homepage order:
 
 ```json
 {
@@ -38,10 +45,6 @@ Use `gallery.config.json` to give URL-safe album folders display titles in any l
 }
 ```
 
-The folder name remains the URL (`photos/japan/` → `/japan`), while the configured title appears on the homepage, album page, and browser tab. Albums without a configured title fall back to their folder name.
+The folder name remains the URL. Albums without a configured title use their folder name. Albums omitted from `order` are appended in natural folder-name order. Invalid, unknown, or duplicate configuration entries fail the build.
 
-The optional `order` array controls homepage album order. Listed albums appear first in that exact order; albums omitted from the array are appended using their natural folder-name order. Unknown or duplicate names cause the build to fail instead of silently producing an unexpected order.
-
-`dist/` is generated and should not be edited manually. For Cloudflare Pages, upload `dist/` as the static output directory using the web interface.
-
-Photo names come from filenames. Dates come from EXIF `DateTimeOriginal`, with `CreateDate` as fallback; photos without either date remain undated.
+The wall includes Random, Reverse, Show name, and Show time controls. Their values are saved in the current browser with `localStorage`. Photos open in a responsive keyboard-accessible lightbox.

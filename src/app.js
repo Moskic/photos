@@ -122,6 +122,12 @@ function stablePhotoId(photo) {
   return filename.replace(/\.[^.]+$/, "");
 }
 
+function photoDescription(photo) {
+  if (photo.name) return photo.name;
+  if (photo.takenAt) return `photo taken on ${photo.takenAt}`;
+  return "photo";
+}
+
 const prefersReducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const revealObserver = "IntersectionObserver" in window
   ? new IntersectionObserver((entries) => {
@@ -173,7 +179,7 @@ function createPhotoCard(photo, index) {
   card.className = "polaroid photo-card";
   card.type = "button";
   card.dataset.photoId = photo.id;
-  card.setAttribute("aria-label", `View ${photo.name}`);
+  card.setAttribute("aria-label", `View ${photoDescription(photo)}`);
   card.style.setProperty("--tilt", tiltForPhoto(photo.id));
   card.style.setProperty("--lift", liftFromId(photo.id));
   card.style.setProperty("--card-width", cardWidthForPhoto(photo));
@@ -184,7 +190,7 @@ function createPhotoCard(photo, index) {
 
   const image = document.createElement("img");
   image.src = photo.src;
-  image.alt = photo.name;
+  image.alt = "";
   image.width = photo.width;
   image.height = photo.height;
   image.decoding = "async";
@@ -193,7 +199,7 @@ function createPhotoCard(photo, index) {
   image.addEventListener("load", () => image.classList.add("is-loaded"), { once: true });
   image.addEventListener("error", () => {
     image.classList.add("is-broken");
-    frame.setAttribute("aria-label", `${photo.name} failed to load`);
+    frame.setAttribute("aria-label", `${photoDescription(photo)} failed to load`);
   }, { once: true });
   if (image.complete && image.naturalWidth) image.classList.add("is-loaded");
 
@@ -202,8 +208,8 @@ function createPhotoCard(photo, index) {
 
   const name = document.createElement("span");
   name.className = "photo-name";
-  name.textContent = photo.name;
-  name.hidden = !elements.showName.checked;
+  name.textContent = photo.name ?? "";
+  name.hidden = !elements.showName.checked || !photo.name;
 
   const time = document.createElement("time");
   time.className = "photo-time";
@@ -333,7 +339,9 @@ function setSettingsOpen(open) {
 }
 
 function updateCaptionVisibility() {
-  for (const name of document.querySelectorAll(".photo-name")) name.hidden = !elements.showName.checked;
+  for (const name of document.querySelectorAll(".photo-name")) {
+    name.hidden = !elements.showName.checked || !name.textContent;
+  }
   for (const time of document.querySelectorAll(".photo-time")) {
     time.hidden = !elements.showTime.checked || !time.dateTime;
   }
@@ -359,7 +367,7 @@ function createLightboxSlide(photo, offset) {
 
   const image = document.createElement("img");
   image.src = photo.src;
-  image.alt = offset === 0 ? photo.name : "";
+  image.alt = offset === 0 ? photoDescription(photo) : "";
   image.width = photo.width;
   image.height = photo.height;
   image.decoding = "async";
@@ -372,8 +380,8 @@ function createLightboxSlide(photo, offset) {
   caption.className = "polaroid-meta lightbox-caption";
   const name = document.createElement("span");
   name.className = "photo-name lightbox-name";
-  name.textContent = photo.name;
-  name.hidden = !elements.showName.checked;
+  name.textContent = photo.name ?? "";
+  name.hidden = !elements.showName.checked || !photo.name;
   const time = document.createElement("time");
   time.className = "photo-time lightbox-time";
   if (photo.takenAt) {

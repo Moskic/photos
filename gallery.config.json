@@ -1,11 +1,11 @@
 {
-  "order": ["japan", "hello"],
+  "order": ["2026", "2025"],
   "albums": {
-    "hello": {
-      "title": "你好"
+    "2026": {
+      "title": "2026"
     },
-    "japan": {
-      "title": "日本旅行"
+    "2025": {
+      "title": "2025"
     }
   }
 }

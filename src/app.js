@@ -277,7 +277,7 @@ function renderAlbums(albums) {
       if (image.complete && image.naturalWidth) image.classList.add("is-loaded");
       cover.append(image);
     } else {
-      link.style.setProperty("--tilt", tiltFromId(album.slug + index, 2));
+      link.style.setProperty("--tilt", tiltForPhoto(album.slug + index, 2));
       link.style.setProperty("--card-width", "361px");
       cover.classList.add("is-empty");
     }

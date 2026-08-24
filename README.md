@@ -4,9 +4,10 @@ A framework-free, build-time photo gallery for static hosting. Each direct child
 
 ```text
 photos/
-  hello/                         -> /hello
-  japan/                         -> /japan
-    2026/01/02/IMG_1234.jpg      -> part of /japan
+  2025/                              -> /2025
+    2025-07-01/DSCF0033.JPG          -> part of /2025
+  2026/                              -> /2026
+    2026-01-10/DSC02553.jpg          -> part of /2026
 ```
 
 ## Build and preview
@@ -19,7 +20,7 @@ npm run build
 python3 -m http.server 8000 -d dist
 ```
 
-Open `http://localhost:8000/` for the album index or a route such as `http://localhost:8000/hello`.
+Open `http://localhost:8000/` for the album index or a route such as `http://localhost:8000/2026`.
 
 `npm run build` clears and recreates `dist/`. Do not edit it manually. For Cloudflare Pages, manually deploy `dist/` as the static output directory.
 
@@ -37,10 +38,10 @@ Open `http://localhost:8000/` for the album index or a route such as `http://loc
 
 ```json
 {
-  "order": ["japan", "hello"],
+  "order": ["2026", "2025"],
   "albums": {
-    "hello": { "title": "你好" },
-    "japan": { "title": "日本旅行" }
+    "2026": { "title": "2026" },
+    "2025": { "title": "2025" }
   }
 }
 ```

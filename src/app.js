@@ -305,7 +305,7 @@ async function fetchJson(url) {
 }
 
 async function loadHome() {
-  document.title = "Photo Gallery";
+  document.title = "Photo Gallery | Moskic";
   elements.title.textContent = "Photo Gallery";
   elements.homeLink.hidden = true;
   try {
@@ -323,7 +323,7 @@ async function loadHome() {
 }
 
 async function loadAlbum(album) {
-  document.title = `${album} — Photo Gallery`;
+  document.title = `${album} - Photo Gallery | Moskic`;
   elements.title.textContent = album;
   elements.homeLink.hidden = false;
   elements.settingsButton.hidden = false;
@@ -331,7 +331,7 @@ async function loadAlbum(album) {
     const data = await fetchJson(`/data/${encodeURIComponent(album)}.json`);
     if (!Array.isArray(data.photos)) throw new Error("Invalid album index");
     const displayTitle = data.title || album;
-    document.title = `${displayTitle} — Photo Gallery`;
+    document.title = `${displayTitle} - Photo Gallery | Moskic`;
     elements.title.textContent = displayTitle;
     state.photos = data.photos;
     clearStatus();

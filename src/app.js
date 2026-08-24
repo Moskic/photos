@@ -13,9 +13,7 @@ const elements = {
   showTime: document.querySelector("#show-time"),
   count: document.querySelector("#photo-count"),
   lightbox: document.querySelector("#lightbox"),
-  lightboxImage: document.querySelector("#lightbox-image"),
-  lightboxName: document.querySelector("#lightbox-name"),
-  lightboxTime: document.querySelector("#lightbox-time"),
+  lightboxTrack: document.querySelector("#lightbox-track"),
   lightboxPrevious: document.querySelector("#lightbox-previous"),
   lightboxNext: document.querySelector("#lightbox-next"),
   lightboxClose: document.querySelector("#lightbox-close")
@@ -26,7 +24,9 @@ const state = {
   visiblePhotos: [],
   shuffledPhotos: null,
   activeIndex: -1,
-  returnFocus: null
+  returnFocus: null,
+  lightboxMoving: false,
+  lightboxDirection: 0
 };
 
 function pathParts() {
@@ -60,6 +60,45 @@ function liftFromId(id) {
   return `${value * 12}px`;
 }
 
+function cardWidthForPhoto(photo) {
+  const imageWidth = Math.min(540, Math.round((photo.width / photo.height) * 300));
+  return `${imageWidth + 61}px`;
+}
+
+function stablePhotoId(photo) {
+  if (photo.id) return photo.id;
+  const filename = photo.src.split("/").pop() || photo.src;
+  return filename.replace(/\.[^.]+$/, "");
+}
+
+const prefersReducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+const revealObserver = "IntersectionObserver" in window
+  ? new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting && entry.intersectionRatio < 0.15) continue;
+        entry.target.classList.add("is-revealed");
+        revealObserver.unobserve(entry.target);
+      }
+    }, { threshold: [0, 0.15] })
+  : null;
+
+function observeReveal(element, index) {
+  element.classList.add("wall-polaroid");
+  element.style.setProperty("--reveal-delay", `${Math.min(index, 6) * 35}ms`);
+  if (prefersReducedMotion.matches || !revealObserver) {
+    element.classList.add("is-revealed");
+    return;
+  }
+  revealObserver.observe(element);
+}
+
+function stopObserving(container) {
+  if (!revealObserver) return;
+  for (const element of container.querySelectorAll(".wall-polaroid")) {
+    revealObserver.unobserve(element);
+  }
+}
+
 function shuffle(items) {
   const result = [...items];
   for (let index = result.length - 1; index > 0; index -= 1) {
@@ -80,17 +119,16 @@ function currentPhotos() {
 
 function createPhotoCard(photo, index) {
   const card = document.createElement("button");
-  card.className = "photo-card";
+  card.className = "polaroid photo-card";
   card.type = "button";
   card.dataset.photoId = photo.id;
   card.setAttribute("aria-label", `View ${photo.name}`);
   card.style.setProperty("--tilt", tiltFromId(photo.id));
   card.style.setProperty("--lift", liftFromId(photo.id));
-  const displayWidth = Math.min(540, Math.round((photo.width / photo.height) * 300));
-  card.style.setProperty("--card-width", `${Math.ceil(displayWidth / 0.88235)}px`);
+  card.style.setProperty("--card-width", cardWidthForPhoto(photo));
 
   const frame = document.createElement("span");
-  frame.className = "photo-frame";
+  frame.className = "polaroid-frame photo-frame";
   frame.style.aspectRatio = `${photo.width} / ${photo.height}`;
 
   const image = document.createElement("img");
@@ -109,7 +147,7 @@ function createPhotoCard(photo, index) {
   if (image.complete && image.naturalWidth) image.classList.add("is-loaded");
 
   const meta = document.createElement("span");
-  meta.className = "photo-meta";
+  meta.className = "polaroid-meta photo-meta";
 
   const name = document.createElement("span");
   name.className = "photo-name";
@@ -128,28 +166,32 @@ function createPhotoCard(photo, index) {
   meta.append(name, time);
   card.append(frame, meta);
   card.addEventListener("click", () => openLightbox(index, card));
+  observeReveal(card, index);
   return card;
 }
 
 function renderWall() {
   state.visiblePhotos = currentPhotos();
+  stopObserving(elements.wall);
   elements.wall.replaceChildren(...state.visiblePhotos.map(createPhotoCard));
   elements.count.textContent = String(state.visiblePhotos.length);
 }
 
 function renderAlbums(albums) {
+  stopObserving(elements.albumList);
   elements.albumList.replaceChildren();
   for (const [index, album] of albums.entries()) {
     const link = document.createElement("a");
-    link.className = "album-link";
+    link.className = "polaroid album-link";
     link.href = `/${encodeURIComponent(album.slug)}/`;
-    link.style.setProperty("--tilt", tiltFromId(album.slug + index, 2));
 
     const cover = document.createElement("span");
-    cover.className = "album-cover";
+    cover.className = "polaroid-frame album-cover";
     const covers = Array.isArray(album.covers) ? album.covers : [];
     const photo = covers[Math.floor(Math.random() * covers.length)];
     if (photo) {
+      link.style.setProperty("--tilt", tiltFromId(stablePhotoId(photo)));
+      link.style.setProperty("--card-width", cardWidthForPhoto(photo));
       cover.style.aspectRatio = `${photo.width} / ${photo.height}`;
       const image = document.createElement("img");
       image.src = photo.src;
@@ -162,11 +204,13 @@ function renderAlbums(albums) {
       if (image.complete && image.naturalWidth) image.classList.add("is-loaded");
       cover.append(image);
     } else {
+      link.style.setProperty("--tilt", tiltFromId(album.slug + index, 2));
+      link.style.setProperty("--card-width", "361px");
       cover.classList.add("is-empty");
     }
 
     const info = document.createElement("span");
-    info.className = "album-info";
+    info.className = "polaroid-meta album-info";
     const name = document.createElement("strong");
     name.textContent = album.name;
     const count = document.createElement("span");
@@ -175,6 +219,7 @@ function renderAlbums(albums) {
 
     info.append(name, count);
     link.append(cover, info);
+    observeReveal(link, index);
     elements.albumList.append(link);
   }
   elements.albumList.hidden = false;
@@ -241,22 +286,65 @@ function updateCaptionVisibility() {
   for (const time of document.querySelectorAll(".photo-time")) {
     time.hidden = !elements.showTime.checked || !time.dateTime;
   }
-  if (elements.lightbox.open && state.activeIndex >= 0) updateLightbox();
 }
 
-function updateLightbox() {
-  const photo = state.visiblePhotos[state.activeIndex];
-  if (!photo) return;
-  elements.lightboxImage.src = photo.src;
-  elements.lightboxImage.alt = photo.name;
-  const photoRatio = photo.width / photo.height;
-  const figureRatio = 1 / (0.249 + 0.88235 / photoRatio);
-  elements.lightboxImage.closest(".lightbox-figure").style.setProperty("--figure-ratio", figureRatio);
-  elements.lightboxName.textContent = photo.name;
-  elements.lightboxName.hidden = !elements.showName.checked;
-  elements.lightboxTime.textContent = photo.takenAt ? photo.takenAt.replaceAll("-", ".") : "";
-  elements.lightboxTime.dateTime = photo.takenAt || "";
-  elements.lightboxTime.hidden = !elements.showTime.checked || !photo.takenAt;
+function photoAt(index) {
+  const count = state.visiblePhotos.length;
+  return count ? state.visiblePhotos[(index + count) % count] : null;
+}
+
+function createLightboxSlide(photo, offset) {
+  const slide = document.createElement("div");
+  slide.className = "lightbox-slide";
+  slide.setAttribute("aria-hidden", String(offset !== 0));
+
+  const figure = document.createElement("figure");
+  figure.className = "polaroid lightbox-figure";
+  figure.style.setProperty("--card-width", cardWidthForPhoto(photo));
+
+  const frame = document.createElement("span");
+  frame.className = "polaroid-frame lightbox-frame";
+  frame.style.aspectRatio = `${photo.width} / ${photo.height}`;
+
+  const image = document.createElement("img");
+  image.src = photo.src;
+  image.alt = offset === 0 ? photo.name : "";
+  image.width = photo.width;
+  image.height = photo.height;
+  image.decoding = "async";
+  image.loading = offset === 0 ? "eager" : "lazy";
+  image.addEventListener("load", () => image.classList.add("is-loaded"), { once: true });
+  if (image.complete && image.naturalWidth) image.classList.add("is-loaded");
+  frame.append(image);
+
+  const caption = document.createElement("figcaption");
+  caption.className = "polaroid-meta lightbox-caption";
+  const name = document.createElement("span");
+  name.className = "photo-name lightbox-name";
+  name.textContent = photo.name;
+  name.hidden = !elements.showName.checked;
+  const time = document.createElement("time");
+  time.className = "photo-time lightbox-time";
+  if (photo.takenAt) {
+    time.dateTime = photo.takenAt;
+    time.textContent = photo.takenAt.replaceAll("-", ".");
+  }
+  time.hidden = !elements.showTime.checked || !photo.takenAt;
+  caption.append(name, time);
+  figure.append(frame, caption);
+  slide.append(figure);
+  return slide;
+}
+
+function renderLightboxSlides() {
+  const current = photoAt(state.activeIndex);
+  if (!current) return;
+  const slides = [-1, 0, 1].map((offset) => createLightboxSlide(photoAt(state.activeIndex + offset), offset));
+  elements.lightboxTrack.classList.remove("is-animating");
+  elements.lightboxTrack.style.transform = "translateX(-100%)";
+  elements.lightboxTrack.replaceChildren(...slides);
+  state.lightboxMoving = false;
+  state.lightboxDirection = 0;
   const hideNavigation = state.visiblePhotos.length < 2;
   elements.lightboxPrevious.hidden = hideNavigation;
   elements.lightboxNext.hidden = hideNavigation;
@@ -265,7 +353,7 @@ function updateLightbox() {
 function openLightbox(index, card) {
   state.activeIndex = index;
   state.returnFocus = card;
-  updateLightbox();
+  renderLightboxSlides();
   document.body.classList.add("lightbox-open");
   elements.lightbox.showModal();
   elements.lightboxClose.focus();
@@ -278,9 +366,16 @@ function closeLightbox() {
 
 function moveLightbox(direction) {
   const count = state.visiblePhotos.length;
-  if (count < 2) return;
-  state.activeIndex = (state.activeIndex + direction + count) % count;
-  updateLightbox();
+  if (count < 2 || state.lightboxMoving) return;
+  state.lightboxMoving = true;
+  state.lightboxDirection = direction > 0 ? 1 : -1;
+  elements.lightboxTrack.classList.remove("is-animating");
+  elements.lightboxTrack.style.transform = "translateX(-100%)";
+  void elements.lightboxTrack.offsetWidth;
+  elements.lightboxTrack.classList.add("is-animating");
+  requestAnimationFrame(() => {
+    elements.lightboxTrack.style.transform = direction > 0 ? "translateX(-200%)" : "translateX(0)";
+  });
 }
 
 elements.settingsButton.addEventListener("click", () => {
@@ -308,14 +403,25 @@ elements.lightboxClose.addEventListener("click", closeLightbox);
 elements.lightboxPrevious.addEventListener("click", () => moveLightbox(-1));
 elements.lightboxNext.addEventListener("click", () => moveLightbox(1));
 
+elements.lightboxTrack.addEventListener("transitionend", (event) => {
+  if (event.propertyName !== "transform" || !state.lightboxMoving) return;
+  const count = state.visiblePhotos.length;
+  state.activeIndex = (state.activeIndex + state.lightboxDirection + count) % count;
+  renderLightboxSlides();
+});
+
 elements.lightbox.addEventListener("click", (event) => {
-  if (event.target === elements.lightbox) closeLightbox();
+  if (event.target === elements.lightbox || event.target.classList.contains("lightbox-slide")) {
+    closeLightbox();
+  }
 });
 
 elements.lightbox.addEventListener("close", () => {
   document.body.classList.remove("lightbox-open");
   const target = state.returnFocus;
   state.activeIndex = -1;
+  state.lightboxMoving = false;
+  state.lightboxDirection = 0;
   state.returnFocus = null;
   if (target?.isConnected) target.focus();
 });

@@ -28,6 +28,7 @@ const state = {
   returnFocus: null,
   lightboxMoving: false,
   lightboxDirection: 0,
+  lightboxZoomed: false,
   lightboxClosing: false,
   lightboxAnimationTimer: null
 };
@@ -114,6 +115,21 @@ function liftFromId(id) {
 function cardWidthForPhoto(photo) {
   const imageWidth = Math.min(540, Math.round((photo.width / photo.height) * 300));
   return `${imageWidth + 61}px`;
+}
+
+function zoomCardWidthForPhoto(photo) {
+  const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
+  const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+  const horizontalFrame = 60.8;
+  const verticalFrame = 127.2;
+  const maxImageWidth = Math.max(1, viewportWidth - 64 - horizontalFrame);
+  const maxImageHeight = Math.max(1, viewportHeight - 48 - verticalFrame);
+  const imageWidth = Math.min(
+    photo.width,
+    maxImageWidth,
+    maxImageHeight * (photo.width / photo.height)
+  );
+  return `${Math.round(imageWidth + horizontalFrame)}px`;
 }
 
 function stablePhotoId(photo) {
@@ -352,6 +368,35 @@ function photoAt(index) {
   return count ? state.visiblePhotos[(index + count) % count] : null;
 }
 
+function updateLightboxZoomSizes() {
+  for (const figure of elements.lightboxTrack.querySelectorAll(".lightbox-figure")) {
+    const width = Number(figure.dataset.photoWidth);
+    const height = Number(figure.dataset.photoHeight);
+    if (!width || !height) continue;
+    figure.style.setProperty("--zoom-card-width", zoomCardWidthForPhoto({ width, height }));
+  }
+}
+
+function setLightboxZoomed(zoomed) {
+  if (zoomed && (!elements.lightbox.open || state.lightboxMoving || state.lightboxClosing)) return;
+  const activeFigure = elements.lightboxTrack.querySelector('.lightbox-slide[aria-hidden="false"] .lightbox-figure');
+  if (zoomed && activeFigure) {
+    const zoomWidth = Number.parseFloat(activeFigure.style.getPropertyValue("--zoom-card-width"));
+    if (!zoomWidth || zoomWidth <= activeFigure.offsetWidth + 4) return;
+  }
+  state.lightboxZoomed = zoomed;
+  elements.lightbox.classList.toggle("is-zoomed", zoomed);
+  const activeFrame = activeFigure?.querySelector(".lightbox-frame");
+  if (activeFrame) {
+    activeFrame.setAttribute("aria-pressed", String(zoomed));
+    activeFrame.setAttribute("aria-label", zoomed ? "Restore photo size" : "Enlarge photo");
+  }
+}
+
+function toggleLightboxZoom() {
+  setLightboxZoomed(!state.lightboxZoomed);
+}
+
 function createLightboxSlide(photo, offset) {
   const slide = document.createElement("div");
   slide.className = "lightbox-slide";
@@ -360,10 +405,50 @@ function createLightboxSlide(photo, offset) {
   const figure = document.createElement("figure");
   figure.className = "polaroid lightbox-figure";
   figure.style.setProperty("--card-width", cardWidthForPhoto(photo));
+  figure.style.setProperty("--zoom-card-width", zoomCardWidthForPhoto(photo));
+  figure.dataset.photoWidth = String(photo.width);
+  figure.dataset.photoHeight = String(photo.height);
 
-  const frame = document.createElement("span");
+  const frame = document.createElement("button");
   frame.className = "polaroid-frame lightbox-frame";
+  frame.type = "button";
+  frame.tabIndex = offset === 0 ? 0 : -1;
+  frame.setAttribute("aria-label", "Enlarge photo");
+  frame.setAttribute("aria-pressed", "false");
   frame.style.aspectRatio = `${photo.width} / ${photo.height}`;
+
+  let touchStart = null;
+  let lastTouchTap = 0;
+  let ignoreClickUntil = 0;
+  frame.addEventListener("pointerdown", (event) => {
+    if (offset !== 0 || event.pointerType !== "touch") return;
+    touchStart = { x: event.clientX, y: event.clientY };
+  });
+  frame.addEventListener("pointerup", (event) => {
+    if (offset !== 0 || event.pointerType !== "touch" || !touchStart) return;
+    const distance = Math.hypot(event.clientX - touchStart.x, event.clientY - touchStart.y);
+    touchStart = null;
+    ignoreClickUntil = performance.now() + 500;
+    if (distance > 12) {
+      lastTouchTap = 0;
+      return;
+    }
+    const now = performance.now();
+    if (now - lastTouchTap <= 320) {
+      lastTouchTap = 0;
+      toggleLightboxZoom();
+    } else {
+      lastTouchTap = now;
+    }
+  });
+  frame.addEventListener("pointercancel", () => {
+    touchStart = null;
+    lastTouchTap = 0;
+  });
+  frame.addEventListener("click", (event) => {
+    if (offset !== 0 || performance.now() < ignoreClickUntil) return;
+    if (event.detail === 0 || event.pointerType !== "touch") toggleLightboxZoom();
+  });
 
   const image = document.createElement("img");
   image.src = photo.src;
@@ -398,6 +483,8 @@ function createLightboxSlide(photo, offset) {
 function renderLightboxSlides() {
   const current = photoAt(state.activeIndex);
   if (!current) return;
+  state.lightboxZoomed = false;
+  elements.lightbox.classList.remove("is-zoomed");
   const slides = [-1, 0, 1].map((offset) => createLightboxSlide(photoAt(state.activeIndex + offset), offset));
   elements.lightboxTrack.classList.remove("is-animating");
   elements.lightboxTrack.style.transform = "translateX(-100%)";
@@ -412,6 +499,7 @@ function renderLightboxSlides() {
 function openLightbox(index, card) {
   state.activeIndex = index;
   state.returnFocus = card;
+  state.lightboxZoomed = false;
   state.lightboxClosing = false;
   renderLightboxSlides();
   document.body.classList.add("lightbox-open");
@@ -453,6 +541,7 @@ function closeLightbox() {
 function moveLightbox(direction) {
   const count = state.visiblePhotos.length;
   if (count < 2 || state.lightboxMoving) return;
+  setLightboxZoomed(false);
   state.lightboxMoving = true;
   state.lightboxDirection = direction > 0 ? 1 : -1;
   elements.lightboxTrack.classList.remove("is-animating");
@@ -512,6 +601,10 @@ elements.lightbox.addEventListener("click", (event) => {
 
 elements.lightbox.addEventListener("cancel", (event) => {
   event.preventDefault();
+  if (state.lightboxZoomed) {
+    setLightboxZoomed(false);
+    return;
+  }
   closeLightbox();
 });
 
@@ -524,6 +617,7 @@ elements.lightbox.addEventListener("close", () => {
   state.activeIndex = -1;
   state.lightboxMoving = false;
   state.lightboxDirection = 0;
+  state.lightboxZoomed = false;
   state.lightboxClosing = false;
   state.returnFocus = null;
   if (target?.isConnected) target.focus();
@@ -535,6 +629,12 @@ document.addEventListener("keydown", (event) => {
     setSettingsOpen(false);
   }
   if (!elements.lightbox.open) return;
+  if (event.key === "Escape" && state.lightboxZoomed) {
+    event.preventDefault();
+    event.stopPropagation();
+    setLightboxZoomed(false);
+    return;
+  }
   if (event.key === "ArrowLeft") {
     event.preventDefault();
     moveLightbox(-1);
@@ -544,6 +644,9 @@ document.addEventListener("keydown", (event) => {
     moveLightbox(1);
   }
 });
+
+window.addEventListener("resize", updateLightboxZoomSizes);
+window.visualViewport?.addEventListener("resize", updateLightboxZoomSizes);
 
 loadSettings();
 const parts = pathParts();

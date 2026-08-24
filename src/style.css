@@ -598,6 +598,7 @@ input:focus-visible,
   padding: clamp(64px, 7vw, 88px) clamp(64px, 8vw, 112px);
   align-items: center;
   justify-content: center;
+  transition: padding 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .lightbox-figure {
@@ -606,10 +607,18 @@ input:focus-visible,
   max-height: none;
   margin: 0;
   box-shadow: 0 26px 64px rgb(25 29 36 / 22%), 0 4px 10px rgb(25 29 36 / 10%);
+  transition:
+    width 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 220ms ease;
 }
 
 .lightbox-frame {
   flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  cursor: zoom-in;
+  touch-action: manipulation;
 }
 
 .lightbox-frame img {
@@ -623,6 +632,25 @@ input:focus-visible,
 
 .lightbox-caption {
   padding: 0 0 20px;
+  opacity: 1;
+  transition: opacity 180ms ease;
+}
+
+.lightbox.is-zoomed .lightbox-slide {
+  padding: 24px 32px;
+}
+
+.lightbox.is-zoomed .lightbox-slide[aria-hidden="false"] .lightbox-figure {
+  width: min(var(--zoom-card-width), calc(100vw - 24px));
+  box-shadow: 0 32px 76px rgb(25 29 36 / 24%), 0 5px 12px rgb(25 29 36 / 11%);
+}
+
+.lightbox.is-zoomed .lightbox-slide[aria-hidden="false"] .lightbox-frame {
+  cursor: zoom-out;
+}
+
+.lightbox.is-zoomed .lightbox-slide[aria-hidden="false"] .lightbox-caption {
+  opacity: 0;
 }
 
 .lightbox-name {

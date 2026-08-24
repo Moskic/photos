@@ -2,6 +2,14 @@
 
 A framework-free, build-time photo gallery for static hosting. Each direct child of `photos/` becomes an album; nested folders are scanned recursively.
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/home.png" alt="Album index" width="32%">
+  <img src="docs/screenshots/wall.png" alt="Photo wall" width="32%">
+  <img src="docs/screenshots/lightbox.png" alt="Photo lightbox" width="32%">
+</p>
+
 ```text
 photos/
   2025/                              -> /2025

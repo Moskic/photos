@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <meta name="theme-color" content="#efefed">
+    <link rel="icon" href="data:,">
+    <title>Photo Gallery</title>
+    <link rel="stylesheet" href="/style.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="home-link" href="/" aria-label="All albums">Gallery</a>
+      <h1 id="page-title" class="page-title">Photo Gallery</h1>
+    </header>
+
+    <button
+      id="settings-button"
+      class="round-button settings-button"
+      type="button"
+      aria-label="Open settings panel"
+      aria-controls="settings-panel"
+      aria-expanded="false"
+      hidden
+    >
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+    </button>
+
+    <button id="settings-backdrop" class="settings-backdrop" type="button" aria-label="Close settings panel" hidden></button>
+
+    <aside id="settings-panel" class="settings-panel" aria-labelledby="controls-title" hidden>
+      <div class="panel-handle" aria-hidden="true"></div>
+      <p id="controls-title" class="eyebrow">Wall controls</p>
+      <div class="controls-grid">
+        <label class="control-card">
+          <span>Random order</span>
+          <input id="random-order" type="checkbox" role="switch">
+        </label>
+        <label class="control-card">
+          <span>Reverse order</span>
+          <input id="reverse-order" type="checkbox" role="switch">
+        </label>
+        <label class="control-card">
+          <span>Show name</span>
+          <input id="show-name" type="checkbox" role="switch" checked>
+        </label>
+        <label class="control-card">
+          <span>Show time</span>
+          <input id="show-time" type="checkbox" role="switch" checked>
+        </label>
+        <div class="control-card count-card" aria-live="polite">
+          <span>Photos loaded</span>
+          <strong id="photo-count">0</strong>
+        </div>
+      </div>
+    </aside>
+
+    <main id="main" tabindex="-1">
+      <div id="status" class="status" role="status">Loading…</div>
+      <section id="album-list" class="album-list" aria-label="Albums" hidden></section>
+      <section id="photo-wall" class="photo-wall" aria-label="Photos" hidden></section>
+    </main>
+
+    <dialog id="lightbox" class="lightbox" aria-label="Photo viewer">
+      <button id="lightbox-close" class="round-button lightbox-close" type="button" aria-label="Close photo viewer">×</button>
+      <button id="lightbox-previous" class="lightbox-nav lightbox-previous" type="button" aria-label="Previous photo">‹</button>
+      <figure class="lightbox-figure">
+        <img id="lightbox-image" alt="">
+        <figcaption class="lightbox-caption">
+          <span id="lightbox-name"></span>
+          <time id="lightbox-time"></time>
+        </figcaption>
+      </figure>
+      <button id="lightbox-next" class="lightbox-nav lightbox-next" type="button" aria-label="Next photo">›</button>
+    </dialog>
+  </body>
+</html>

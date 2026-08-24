@@ -1,0 +1,11 @@
+{
+  "order": ["japan", "hello"],
+  "albums": {
+    "hello": {
+      "title": "你好"
+    },
+    "japan": {
+      "title": "日本旅行"
+    }
+  }
+}

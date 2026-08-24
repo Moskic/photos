@@ -64,10 +64,15 @@ input:focus-visible,
 
 .home-link {
   position: absolute;
-  left: 88px;
+  top: 16px;
+  left: 84px;
+  display: flex;
+  height: 52px;
+  align-items: center;
   color: #252a34;
   font-size: 0.78rem;
   font-weight: 800;
+  line-height: 1;
   letter-spacing: 0.16em;
   text-decoration: none;
   text-transform: uppercase;
@@ -572,8 +577,27 @@ input:focus-visible,
   z-index: 4;
   top: 16px;
   right: 16px;
-  font-size: 2rem;
-  line-height: 1;
+  font-size: 0;
+}
+
+.lightbox-close::before,
+.lightbox-close::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 2.5px;
+  border-radius: 99px;
+  background: currentColor;
+  content: "";
+}
+
+.lightbox-close::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.lightbox-close::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
 }
 
 .lightbox-nav {
@@ -633,7 +657,11 @@ body.lightbox-open {
   }
 
   .home-link {
-    display: none;
+    top: 12px;
+    left: 72px;
+    display: flex;
+    height: 48px;
+    font-size: 0.68rem;
   }
 
   .page-title {

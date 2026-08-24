@@ -29,6 +29,51 @@ const state = {
   lightboxDirection: 0
 };
 
+const SETTINGS_STORAGE_KEY = "static-photo-gallery-wall-controls";
+const DEFAULT_SETTINGS = {
+  randomOrder: true,
+  reverseOrder: false,
+  showName: true,
+  showTime: true
+};
+
+function loadSettings() {
+  let settings = DEFAULT_SETTINGS;
+  try {
+    const stored = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      settings = {
+        randomOrder: typeof parsed.randomOrder === "boolean" ? parsed.randomOrder : DEFAULT_SETTINGS.randomOrder,
+        reverseOrder: typeof parsed.reverseOrder === "boolean" ? parsed.reverseOrder : DEFAULT_SETTINGS.reverseOrder,
+        showName: typeof parsed.showName === "boolean" ? parsed.showName : DEFAULT_SETTINGS.showName,
+        showTime: typeof parsed.showTime === "boolean" ? parsed.showTime : DEFAULT_SETTINGS.showTime
+      };
+    }
+  } catch (error) {
+    console.warn("Could not read saved wall controls", error);
+  }
+
+  if (settings.randomOrder && settings.reverseOrder) settings.reverseOrder = false;
+  elements.random.checked = settings.randomOrder;
+  elements.reverse.checked = settings.reverseOrder;
+  elements.showName.checked = settings.showName;
+  elements.showTime.checked = settings.showTime;
+}
+
+function saveSettings() {
+  try {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({
+      randomOrder: elements.random.checked,
+      reverseOrder: elements.reverse.checked,
+      showName: elements.showName.checked,
+      showTime: elements.showTime.checked
+    }));
+  } catch (error) {
+    console.warn("Could not save wall controls", error);
+  }
+}
+
 function pathParts() {
   return location.pathname
     .split("/")
@@ -386,6 +431,7 @@ elements.settingsBackdrop.addEventListener("click", () => setSettingsOpen(false)
 elements.random.addEventListener("change", () => {
   if (elements.random.checked) elements.reverse.checked = false;
   else state.shuffledPhotos = null;
+  saveSettings();
   renderWall();
 });
 
@@ -394,11 +440,18 @@ elements.reverse.addEventListener("change", () => {
     elements.random.checked = false;
     state.shuffledPhotos = null;
   }
+  saveSettings();
   renderWall();
 });
 
-elements.showName.addEventListener("change", updateCaptionVisibility);
-elements.showTime.addEventListener("change", updateCaptionVisibility);
+elements.showName.addEventListener("change", () => {
+  saveSettings();
+  updateCaptionVisibility();
+});
+elements.showTime.addEventListener("change", () => {
+  saveSettings();
+  updateCaptionVisibility();
+});
 elements.lightboxClose.addEventListener("click", closeLightbox);
 elements.lightboxPrevious.addEventListener("click", () => moveLightbox(-1));
 elements.lightboxNext.addEventListener("click", () => moveLightbox(1));
@@ -442,6 +495,7 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+loadSettings();
 const parts = pathParts();
 if (parts.length === 0) loadHome();
 else if (parts.length === 1) loadAlbum(parts[0]);

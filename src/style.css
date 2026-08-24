@@ -17,13 +17,6 @@
 html {
   min-width: 320px;
   min-height: 100%;
-  background: #f4f4f2;
-}
-
-body {
-  min-height: 100vh;
-  margin: 0;
-  overflow-x: hidden;
   background-color: #f4f4f2;
   background-image:
     radial-gradient(circle, rgb(20 24 31 / 2.8%) 0 0.55px, transparent 0.75px),
@@ -31,6 +24,13 @@ body {
     linear-gradient(115deg, rgb(255 255 255 / 34%), transparent 46%, rgb(25 28 33 / 1.5%));
   background-position: 0 0, 1px 2px, 0 0;
   background-size: 4px 4px, 7px 7px, 100% 100%;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  overflow-x: hidden;
+  background: transparent;
 }
 
 button,
